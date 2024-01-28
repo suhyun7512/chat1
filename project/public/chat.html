@@ -1,0 +1,124 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>채팅 앱</title>
+  <!-- Firebase 스크립트 추가 -->
+  <script src="https://www.gstatic.com/firebasejs/9.5.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.5.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.5.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+<!-- 채팅 내용을 표시할 영역 -->
+<div id="chat-messages" style="border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: scroll;"></div>
+
+<!-- 채팅 입력창 -->
+<input type="text" id="messageInput" placeholder="메시지 입력">
+<button onclick="sendMessage()">전송</button>
+
+<script>
+  // Firebase 구성 정보
+  var firebaseConfig = {
+    apiKey: "AIzaSyCWI27iYb6aoykBEQ9qSOGkPef-alNCruo",
+    authDomain: "code-3108c.firebaseapp.com",
+    databaseURL: "https://code-3108c.firebaseio.com",
+    projectId: "code-3108c",
+    storageBucket: "code-3108c.appspot.com",
+    messagingSenderId: "229428264935",
+    appId: "1:229428264935:web:816128e2484204c7538742",
+    measurementId: "G-D6ZPDTWRCB"
+  };
+
+  // Firebase 초기화
+  firebase.initializeApp(firebaseConfig);
+
+  // Firebase 인증 및 Firestore 참조
+  var auth = firebase.auth();
+  var db = firebase.firestore();
+
+  // 로그인 상태 변경 감지
+  auth.onAuthStateChanged(function(user) {
+    if (user) {
+      console.log("로그인된 사용자:", user.displayName, user.uid);
+      // 채팅 메시지 처리
+      handleMessages(user);
+    } else {
+      console.log("사용자 로그아웃됨");
+    }
+  });
+
+  // 메시지 전송
+  function sendMessage() {
+    var messageInput = document.getElementById('messageInput');
+    var messageContent = messageInput.value.trim();
+
+    if (messageContent !== "") {
+      // 현재 사용자 가져오기
+      var currentUser = auth.currentUser;
+
+      // 사용자 이름 및 UID 가져오기
+      var userName = currentUser.displayName;
+      var uid = currentUser.uid;
+
+      // 채팅 메시지 Firestore에 추가
+      db.collection('chat').add({
+        content: messageContent,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        uid: uid,
+        userName: userName
+      });
+
+      // 메시지 입력창 초기화
+      messageInput.value = "";
+    }
+  }
+
+  // 채팅 메시지 처리
+  function handleMessages(user) {
+    var chatMessages = document.getElementById('chat-messages');
+    var chatCollectionRef = db.collection('chat');
+    var orderedQuery = chatCollectionRef.orderBy('timestamp', 'asc');
+
+    // Firestore 실시간 업데이트
+    var unsubscribe = orderedQuery.onSnapshot(function(querySnapshot) {
+      chatMessages.innerHTML = ""; // 이전 메시지 삭제
+
+      querySnapshot.forEach(function(doc) {
+        var messageData = doc.data();
+
+        // 이름과 내용을 분리하여 표시
+        var messageElement = document.createElement('div');
+        var nameElement = document.createElement('strong');
+        nameElement.textContent = `${messageData.userName}`;
+        messageElement.appendChild(nameElement);
+        messageElement.appendChild(document.createElement('br')); // <br> 추가
+        messageElement.appendChild(document.createTextNode(messageData.content.replace(':', ''))); // 콜론 제거
+
+        // UID 비교를 통한 스타일 적용
+        if (user.uid === messageData.uid) {
+          messageElement.style.textAlign = 'right';
+          messageElement.style.backgroundColor = '#cbe5fc'; // 로그인 사용자와 메시지 작성자가 동일한 경우
+        } else {
+          messageElement.style.textAlign = 'left';
+          messageElement.style.backgroundColor = '#ffffff'; // 로그인 사용자와 메시지 작성자가 다른 경우
+        }
+
+        chatMessages.appendChild(messageElement);
+      });
+
+      // 메시지 업데이트 후 맨 아래로 스크롤
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    });
+
+    // 페이지 이동 또는 어플리케이션 종료 시 실시간 업데이트 중단
+    window.addEventListener('beforeunload', function() {
+      unsubscribe();
+    });
+  }
+</script>
+
+</body>
+</html>
